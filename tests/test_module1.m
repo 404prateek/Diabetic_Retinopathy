@@ -1,4 +1,4 @@
-﻿%% test_module1.m  -  Unit tests for Module 1: Quality Assessment
+%% test_module1.m  -  Unit tests for Module 1: Quality Assessment
 % =========================================================================
 % Project : Explainable AI for DR Screening (PS ID 26038)
 % Owner   : Member 1  (module1_quality/)
@@ -46,5 +46,29 @@ assert(isequal(size(enhanced), size(dummyImg)), ...
        'FAIL: enhanced size must match input size');
 
 fprintf('  PASS  (size=%dx%dx%d)\n\n', size(enhanced,1), size(enhanced,2), size(enhanced,3));
+%% --- Test 3: Quality gate rejects severe blur ----------------------------
 
+severelyBlurred = imgaussfilt(dummyImg, 15);
+blurResult = assessQuality(severelyBlurred);
+
+assert(blurResult.sharpness < 5, ...
+    'FAIL: severe blur should have sharpness < 5');
+
+assert(blurResult.status == "REJECT", ...
+    'FAIL: severe blur should be REJECT');
+
+fprintf('Test 3: Severe blur correctly rejected... PASS\n\n');
+
+
+%% --- Test 4: Enhancement function produces valid output -----------------
+
+enhancedTest = enhanceFundus(dummyImg);
+
+assert(isa(enhancedTest, 'uint8'), ...
+    'FAIL: enhanced image must be uint8');
+
+assert(isequal(size(enhancedTest), size(dummyImg)), ...
+    'FAIL: enhanced image size must match input');
+
+fprintf('Test 4: Enhancement output validation... PASS\n\n');
 fprintf('=== Module 1: ALL TESTS PASSED ===\n');

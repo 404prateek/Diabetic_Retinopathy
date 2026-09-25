@@ -1,4 +1,4 @@
-﻿function imds = loadDataset(dataPath)
+function imds = loadDataset(dataPath)
 % =========================================================================
 % loadDataset  -  Load a fundus image dataset from disk
 % =========================================================================
@@ -22,10 +22,16 @@
 % Dependencies : MATLAB Image Processing Toolbox (imageDatastore)
 % =========================================================================
 
-% TODO: Implement dataset loading.
-%   - Validate that dataPath exists; throw a clear error if not.
-%   - Use imageDatastore() with 'IncludeSubfolders', true and
-%     'LabelSource', 'foldernames'.
-%   - Filter extensions: {'.png','.jpg','.jpeg','.tif'}.
+% Validate that the dataset path exists
+if ~isfolder(dataPath)
+    error('loadDataset:InvalidPath', ...
+        'Dataset folder does not exist: %s', dataPath);
+end
+
+% Create image datastore
+imds = imageDatastore(dataPath, ...
+    'IncludeSubfolders', true, ...
+    'LabelSource', 'foldernames', ...
+    'FileExtensions', {'.png', '.jpg', '.jpeg', '.tif'});
 
 end
