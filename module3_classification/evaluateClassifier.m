@@ -1,41 +1,114 @@
-﻿function metrics = evaluateClassifier(net, imdsTest)
+function metrics = evaluateClassifier(net, imdsTest)
 % =========================================================================
 % evaluateClassifier  -  Evaluate DR classification performance on a test set
 % =========================================================================
-% Purpose : Run the trained classifier over a held-out test imageDatastore,
-%           compute per-class and aggregate metrics, and return them in a
-%           struct for downstream reporting.
-%
-% Owner   : Member 3  (module3_classification/)
-%
-% Inputs  :
-%   net       - Trained network (output of trainClassifier)
-%   imdsTest  - imageDatastore with Labels for the held-out test set
-%
-% Outputs :
-%   metrics   - struct with fields:
-%     .accuracy         (double)        Overall top-1 accuracy
-%     .confusionMatrix  (5x5 double)    Absolute counts (rows=true, cols=pred)
-%     .classNames       (1x5 cell)      ICDR grade labels
-%     .precision        (1x5 double)    Per-class precision
-%     .recall           (1x5 double)    Per-class recall (sensitivity)
-%     .f1Score          (1x5 double)    Per-class F1 score
-%     .kappaScore       (double)        Cohen kappa (ordinal agreement)
-%     .rocAUC           (1x5 double)    One-vs-rest AUC per class
-%
-% Usage example:
-%   metrics = evaluateClassifier(net, imdsTest);
-%   disp(metrics.confusionMatrix);
-%
-% Planned approach (owner to implement):
-%   1. Run classify(net, imdsTest) to get predicted labels.
-%   2. Build confusion matrix (confusionmat).
-%   3. Compute precision, recall, F1 per class.
-%   4. Compute kappa score and one-vs-rest ROC/AUC.
-%
-% Dependencies : MATLAB Deep Learning Toolbox, Statistics Toolbox
-% =========================================================================
 
-% TODO: Implement classifier evaluation metrics.
+    % 1. Resize test images for network input (224x224 for EfficientNet-B0)
+    augimdsTest = augmentedImageDatastore([224 224], imdsTest);
+
+    % 2. Predict probability scores and obtain class predictions
+    scores = predict(net, augimdsTest);
+    [~, maxIdx] = max(scores, [], 2);
+
+    % Extract actual ground-truth categorical labels
+    actualLabels = imdsTest.Labels;
+    classes = categories(actualLabels);
+    numClasses = numel(classes);
+
+    % Create predicted categorical labels matching ground-truth categories
+    predCategorical = categorical(classes(maxIdx), classes);
+
+    % 3. Confusion Matrix (rows = true, cols = pred)
+    cm = confusionmat(actualLabels, predCategorical);
+    totalSamples = sum(cm(:));
+
+    % 4. Top-1 Overall Accuracy
+    accuracy = sum(diag(cm)) / totalSamples;
+
+    % 5. Compute Per-Class Precision, Recall (Sensitivity), and F1 Score
+    precision = zeros(1, numClasses);
+    recall    = zeros(1, numClasses);
+    f1Score   = zeros(1, numClasses);
+
+    for i = 1:numClasses
+        tp = cm(i, i);
+        fp = sum(cm(:, i)) - tp;
+        fn = sum(cm(i, :)) - tp;
+
+        if (tp + fp) > 0
+            precision(i) = tp / (tp + fp);
+        end
+        if (tp + fn) > 0
+            recall(i) = tp / (tp + fn);
+        end
+        if (precision(i) + recall(i)) > 0
+            f1Score(i) = 2 * (precision(i) * recall(i)) / (precision(i) + recall(i));
+        end
+    end
+
+    % 6. Compute Quadratic Weighted Kappa (QWK)
+    actualNum = double(actualLabels);
+    predNum   = double(predCategorical);
+
+    % Weight matrix calculation
+    w = zeros(numClasses, numClasses);
+    for i = 1:numClasses
+        for j = 1:numClasses
+            w(i,j) = ((i - j)^2) / ((numClasses - 1)^2);
+        end
+    end
+
+    % Expected matrix calculation
+    histActual  = sum(cm, 2);
+    histPred    = sum(cm, 1);
+    expectedMat = (histActual * histPred) / totalSamples;
+
+    obsErr = sum(sum(w .* cm)) / totalSamples;
+    expErr = sum(sum(w .* expectedMat)) / totalSamples;
+
+    if expErr == 0
+        kappaScore = 1.0;
+    else
+        kappaScore = 1.0 - (obsErr / expErr);
+    end
+
+    % 7. Compute One-vs-Rest ROC AUC per class
+    rocAUC = zeros(1, numClasses);
+    for i = 1:numClasses
+        binaryTrue = (actualNum == i);
+        classScores = scores(:, i);
+
+        try
+            [~, ~, ~, auc] = perfcurve(binaryTrue, classScores, true);
+            rocAUC(i) = auc;
+        catch
+            rocAUC(i) = NaN;
+        end
+    end
+
+    % 8. ICDR Class Names Mapping
+    icdrMap = containers.Map({'0','1','2','3','4'}, ...
+        {'No DR', 'Mild', 'Moderate', 'Severe', 'Proliferative DR'});
+
+    classNames = cell(1, numClasses);
+    for i = 1:numClasses
+        cName = char(classes(i));
+        if isKey(icdrMap, cName)
+            classNames{i} = icdrMap(cName);
+        else
+            classNames{i} = cName;
+        end
+    end
+
+    % 9. Build and Return Output Struct
+    metrics = struct();
+    metrics.accuracy        = accuracy;
+    metrics.confusionMatrix = cm;
+    metrics.classNames      = classNames;
+    metrics.precision       = precision;
+    metrics.recall          = recall;
+    metrics.f1Score        = f1Score;
+    metrics.kappaScore     = kappaScore;
+    metrics.rocAUC         = rocAUC;
 
 end
