@@ -1,4 +1,4 @@
-function result = assessQuality(I)
+﻿function result = assessQuality(I)
 % =========================================================================
 % assessQuality  -  Assess the quality of a fundus image
 % =========================================================================
@@ -29,6 +29,16 @@ function result = assessQuality(I)
 % Dependencies : MATLAB Image Processing Toolbox
 % =========================================================================
 
+% Guard: handle both uint8 and double inputs
+if ~isa(I, 'uint8')
+    I = im2uint8(I);
+end
+
+% Guard: must be an RGB image
+if size(I, 3) ~= 3
+    error('assessQuality:BadInput', 'Input image must be H x W x 3 RGB uint8.');
+end
+
 % Convert RGB image to grayscale
 grayImage = rgb2gray(I);
 
@@ -47,7 +57,7 @@ greenChannel = double(I(:,:,2));
 
 % Calculate brightness statistics
 result.brightnessMean = mean(greenChannel(:));
-result.brightnessStd = std(greenChannel(:));
+result.brightnessStd  = std(greenChannel(:));
 
 % Quality thresholds
 % Initial calibration based on real IDRiD fundus-image testing.
@@ -63,3 +73,4 @@ else
     result.status = "PASS";
 end
 
+end  % assessQuality

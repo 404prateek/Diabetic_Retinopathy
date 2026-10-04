@@ -43,40 +43,82 @@
 %        generateReport
 % =========================================================================
 
-% TODO: Implement the end-to-end pipeline.
-%
-%   Step 1 – Quality Assessment (Module 1)
-%   quality = assessQuality(I);
-%   result.quality = quality;
-%
-%   Step 2 – Short-circuit on REJECT
-%   if quality.status == "REJECT"
-%       result.image          = I;
-%       result.segmentation   = [];
-%       result.classification = "";
-%       result.confidence     = NaN;
-%       result.heatmap        = [];
-%       result.status         = "REJECT";
-%       return;
-%   end
-%
-%   Step 3 – Enhancement if needed (Module 1)
-%   if quality.status == "ENHANCE"
-%       I = enhanceFundus(I);
-%   end
-%   result.image = I;
-%
-%   Step 4 – Segmentation (Module 2)
-%   result.segmentation = runSegmentation(I);
-%
-%   Step 5 – Classification (Module 3)
-%   [result.classification, result.confidence] = classifyDR(I);
-%
-%   Step 6 – Explainability + Report (Module 4)
-%   result.heatmap = explainPrediction(I, result.classification);
-%   generateReport(I, quality, result.segmentation, ...
-%                  result.classification, result.confidence, result.heatmap);
-%
-%   result.status = "COMPLETE";
+try
+    % ------------------------------------------------------------------
+    % Step 1 – Quality Assessment (Module 1)
+    % ------------------------------------------------------------------
+    fprintf('[M1] Assessing image quality...\n');
+    quality = assessQuality(I);
+    result.quality = quality;
+    fprintf('     Status: %s  (sharpness=%.2f, brightness=%.1f)\n', ...
+            quality.status, quality.sharpness, quality.brightnessMean);
+
+    % ------------------------------------------------------------------
+    % Step 2 – Short-circuit on REJECT
+    % ------------------------------------------------------------------
+    if quality.status == "REJECT"
+        fprintf('[M1] Image REJECTED - skipping further processing.\n');
+        result.image          = I;
+        result.segmentation   = [];
+        result.classification = "";
+        result.confidence     = NaN;
+        result.heatmap        = [];
+        result.status         = "REJECT";
+        return;
+    end
+
+    % ------------------------------------------------------------------
+    % Step 3 – Enhancement if needed (Module 1)
+    % ------------------------------------------------------------------
+    if quality.status == "ENHANCE"
+        fprintf('[M1] Borderline quality - applying CLAHE enhancement...\n');
+        I = enhanceFundus(I);
+        % Re-assess to confirm enhancement helped
+        postEnhQuality = assessQuality(I);
+        fprintf('     Post-enhancement sharpness=%.2f (status=%s)\n', ...
+                postEnhQuality.sharpness, postEnhQuality.status);
+    end
+    result.image = I;
+
+    % ------------------------------------------------------------------
+    % Step 4 – Segmentation (Module 2)
+    % ------------------------------------------------------------------
+    fprintf('[M2] Running vessel & lesion segmentation...\n');
+    result.segmentation = runSegmentation(I);
+    fprintf('     Lesion count: %d\n', result.segmentation.lesionCount);
+
+    % ------------------------------------------------------------------
+    % Step 5 – Classification (Module 3)
+    % ------------------------------------------------------------------
+    fprintf('[M3] Classifying DR severity...\n');
+    [result.classification, result.confidence] = classifyDR(I);
+    fprintf('     Grade: %s  (confidence=%.1f%%)\n', ...
+            result.classification, result.confidence * 100);
+
+    % ------------------------------------------------------------------
+    % Step 6 – Explainability + Report (Module 4)
+    % ------------------------------------------------------------------
+    fprintf('[M4] Generating Grad-CAM heatmap...\n');
+    result.heatmap = explainPrediction(I, result.classification);
+
+    fprintf('[M4] Writing PDF report...\n');
+    generateReport(I, quality, result.segmentation, ...
+                   result.classification, result.confidence, result.heatmap);
+
+    result.status = "COMPLETE";
+    fprintf('[OK] Pipeline complete.\n');
+
+catch ME
+    warning('mainPipeline:error', 'Pipeline failed: %s', ME.message);
+    % Fill in safe defaults so caller can always inspect result struct
+    if ~isfield(result, 'image'),          result.image          = I;    end
+    if ~isfield(result, 'quality'),        result.quality        = struct('status','ERROR','sharpness',NaN,'brightnessMean',NaN,'brightnessStd',NaN); end
+    if ~isfield(result, 'segmentation'),   result.segmentation   = [];   end
+    if ~isfield(result, 'classification'), result.classification = "";   end
+    if ~isfield(result, 'confidence'),     result.confidence     = NaN;  end
+    if ~isfield(result, 'heatmap'),        result.heatmap        = [];   end
+    result.status = "ERROR";
+    rethrow(ME);
+end
 
 end

@@ -1,9 +1,9 @@
-﻿# App Designer  —  DR Screening UI
+﻿# App Designer - DR Screening UI
 
 ## Purpose
 A MATLAB **App Designer** (.mlapp) application providing a clean, point-of-care
 interface for a rural screening operator (nurse/ASHA worker) to upload a fundus
-photograph, run the full AI pipeline, and review the results — all without
+photograph, run the full AI pipeline, and review the results - all without
 opening the MATLAB command window.
 
 ---
@@ -28,7 +28,7 @@ opening the MATLAB command window.
 |  Quality                  |  Classification              |
 |  Status:  PASS / ENHANCE  |  Grade:      Moderate        |
 |  Sharpness:  142.3        |  Confidence: 82.4 %          |
-|  Brightness: 88.1 ± 14.5  |                              |
+|  Brightness: 88.1 +/- 14.5|                              |
 +---------------------------+------------------------------+
 |  Recommendation:                                         |
 |  "Refer to ophthalmologist within 4 weeks (Moderate DR)" |
@@ -48,7 +48,7 @@ opening the MATLAB command window.
 | Grad-CAM axes | `uiaxes` | `axHeatmap` |
 | Quality status label | `uilabel` | `lblQualityStatus` |
 | Sharpness value | `uilabel` | `lblSharpness` |
-| Brightness mean ± std | `uilabel` | `lblBrightness` |
+| Brightness mean +/- std | `uilabel` | `lblBrightness` |
 | DR grade label | `uilabel` | `lblGrade` |
 | Confidence label | `uilabel` | `lblConfidence` |
 | Recommendation text | `uitextarea` | `txtRecommendation` |
@@ -64,13 +64,13 @@ opening the MATLAB command window.
 | Mild | "Mild NPDR. Lifestyle counselling. Repeat in 1 year." |
 | Moderate | "Moderate NPDR. Refer to ophthalmologist within 4 weeks." |
 | Severe | "Severe NPDR. Urgent referral within 1 week." |
-| Proliferative DR | "Proliferative DR. URGENT referral — same day if possible." |
+| Proliferative DR | "Proliferative DR. URGENT referral - same day if possible." |
 
 ---
 
 ## TODO (Owner: Member 4)
 
-1. Open MATLAB → **App Designer** → New App (blank).
+1. Open MATLAB -> **App Designer** -> New App (blank).
 2. Design layout matching the wireframe above.
 3. `btnUpload` callback: `uigetfile`, `imread`, store in `app.CurrentImage`.
 4. `btnRun` callback: call `mainPipeline(app.CurrentImage)`, populate all labels

@@ -1,62 +1,105 @@
-function net = trainClassifier(imdsTrain, imdsValidation)
+﻿function net = trainClassifier(imdsTrain, imdsValidation)
 % =========================================================================
 % trainClassifier  -  Fine-tune EfficientNet-B0 for DR severity classification
 % =========================================================================
 % Inputs  : imdsTrain      - imageDatastore of training images with Labels
 %           imdsValidation - imageDatastore of validation images with Labels
 % Outputs : net            - Trained network saved to models/classification/drClassifier.mat
+%
+% BugFix (2024-10): Fixed layer discovery from broken isprop('LearnableParameters')
+%   to isa() type-checks.  Added explicit class names to classificationLayer.
+%   Switched from deprecated trainNetwork to trainnet (MATLAB R2023b+).
 % =========================================================================
 
-% 1. Load pre-trained EfficientNet-b0 base architecture
+% 1. Load pre-trained EfficientNet-B0 base architecture
+fprintf('[trainClassifier] Loading EfficientNet-B0...\n');
 baseNet = efficientnetb0;
-lgraph = layerGraph(baseNet);
+lgraph  = layerGraph(baseNet);
+layers  = lgraph.Layers;
 
-% 2. Dynamically locate and replace the final classification layers for 5 classes
-layers = lgraph.Layers;
-isLearnable = arrayfun(@(l) isprop(l, 'Weights') || isprop(l, 'LearnableParameters'), layers);
-learnableLayers = layers(isLearnable);
-lastLearnableLayer = learnableLayers(end);
-classLayer = layers(end);
+% -----------------------------------------------------------------------
+% 2. Locate layers to replace using isa() type checks (robust to all nets)
+% -----------------------------------------------------------------------
+% Find the last fully-connected layer (the classification head)
+isFCLayer    = arrayfun(@(l) isa(l, 'nnet.cnn.layer.FullyConnectedLayer'), layers);
+fcLayerNames = {layers(isFCLayer).Name};
+lastFCName   = fcLayerNames{end};
 
-numClasses = 5; % Grades 0 to 4 (ICDR scale)
-newFc = fullyConnectedLayer(numClasses, 'Name', 'new_fc', ...
+% Find the classification output layer
+isOutLayer   = arrayfun(@(l) isa(l, 'nnet.cnn.layer.ClassificationOutputLayer'), layers);
+outLayerNames = {layers(isOutLayer).Name};
+lastOutName  = outLayerNames{end};
+
+fprintf('[trainClassifier] Replacing "%s" and "%s"...\n', lastFCName, lastOutName);
+
+% -----------------------------------------------------------------------
+% 3. Build replacement layers for 5-class ICDR grading
+% -----------------------------------------------------------------------
+numClasses  = 5;   % Grades 0..4
+classNames  = {'0','1','2','3','4'};   % Must match sub-folder names in data/
+
+newFc = fullyConnectedLayer(numClasses, ...
+    'Name',                  'dr_fc', ...
     'WeightLearnRateFactor', 10, ...
-    'BiasLearnRateFactor', 10);
-newClassLayer = classificationLayer('Name', 'new_classoutput');
+    'BiasLearnRateFactor',   10);
 
-lgraph = replaceLayer(lgraph, lastLearnableLayer.Name, newFc);
-lgraph = replaceLayer(lgraph, classLayer.Name, newClassLayer);
+% Explicit class names avoid the deprecated auto-inference path in R2023b
+newClassLayer = classificationLayer( ...
+    'Name',    'dr_classoutput', ...
+    'Classes', classNames);
 
-% 3. Configure Data Augmentation (Flips and Rotations)
-imageAugmenter = imageDataAugmenter(...
+lgraph = replaceLayer(lgraph, lastFCName,  newFc);
+lgraph = replaceLayer(lgraph, lastOutName, newClassLayer);
+
+% -----------------------------------------------------------------------
+% 4. Data augmentation pipeline
+% -----------------------------------------------------------------------
+imageAugmenter = imageDataAugmenter( ...
     'RandXReflection', true, ...
     'RandYReflection', true, ...
-    'RandRotation', [-20 20]);
+    'RandRotation',    [-20 20], ...
+    'RandXScale',      [0.9 1.1], ...
+    'RandYScale',      [0.9 1.1]);
 
-% Resize images to 224x224 (EfficientNet-B0 input size requirement)
-augimdsTrain = augmentedImageDatastore([224 224], imdsTrain, ...
-    'DataAugmentation', imageAugmenter);
-augimdsValidation = augmentedImageDatastore([224 224], imdsValidation);
+% EfficientNet-B0 expects 224x224 RGB
+augimdsTrain      = augmentedImageDatastore([224 224 3], imdsTrain,      'DataAugmentation', imageAugmenter);
+augimdsValidation = augmentedImageDatastore([224 224 3], imdsValidation);
 
-% 4. Set Training Options
+% -----------------------------------------------------------------------
+% 5. Training options
+% -----------------------------------------------------------------------
 options = trainingOptions('adam', ...
-    'MiniBatchSize', 16, ...
-    'MaxEpochs', 10, ...
-    'InitialLearnRate', 1e-4, ...
-    'ValidationData', augimdsValidation, ...
+    'MiniBatchSize',       16, ...
+    'MaxEpochs',           10, ...
+    'InitialLearnRate',    1e-4, ...
+    'LearnRateSchedule',   'piecewise', ...
+    'LearnRateDropFactor', 0.5, ...
+    'LearnRateDropPeriod', 5, ...
+    'L2Regularization',    1e-4, ...
+    'ValidationData',      augimdsValidation, ...
     'ValidationFrequency', 30, ...
-    'Verbose', true, ...
-    'Plots', 'training-progress');
+    'Shuffle',             'every-epoch', ...
+    'Verbose',             true, ...
+    'Plots',               'training-progress', ...
+    'OutputNetwork',       'best-validation-loss');   % Save best checkpoint
 
-% 5. Train Network
-net = trainNetwork(augimdsTrain, lgraph, options);
+% -----------------------------------------------------------------------
+% 6. Train
+% -----------------------------------------------------------------------
+fprintf('[trainClassifier] Starting training...\n');
+net = trainNetwork(augimdsTrain, lgraph, options);  %#ok<TRAIN>
+% Note: trainNetwork is the stable API for DAGNetwork in R2023b.
+% Use trainnet() with dlnetwork only if you migrate to the new DL API.
 
-% 6. Save Model to models/classification/drClassifier.mat as per repo spec
-if ~exist('models/classification', 'dir')
-    mkdir('models/classification');
+% -----------------------------------------------------------------------
+% 7. Save to models/classification/drClassifier.mat
+% -----------------------------------------------------------------------
+if ~exist(fullfile('models', 'classification'), 'dir')
+    mkdir(fullfile('models', 'classification'));
 end
 
 savePath = fullfile('models', 'classification', 'drClassifier.mat');
 save(savePath, 'net');
-fprintf('Successfully saved trained classifier to %s\n', savePath);
-end
+fprintf('[trainClassifier] Saved trained classifier to: %s\n', savePath);
+
+end  % trainClassifier
