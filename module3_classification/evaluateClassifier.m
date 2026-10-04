@@ -1,114 +1,126 @@
-function metrics = evaluateClassifier(net, imdsTest)
 % =========================================================================
-% evaluateClassifier  -  Evaluate DR classification performance on a test set
+% evaluateClassifier.m - Calculate Sensitivity, Specificity, and QWK
 % =========================================================================
+clear; clc;
 
-    % 1. Resize test images for network input (224x224 for EfficientNet-B0)
-    augimdsTest = augmentedImageDatastore([224 224], imdsTest);
+% 1. Define Paths
+projectRoot = pwd;
+aptosDir    = fullfile(projectRoot, 'data', 'APTOS');
+testImgDir  = fullfile(aptosDir, 'test_images'); 
 
-    % 2. Predict probability scores and obtain class predictions
-    scores = predict(net, augimdsTest);
-    [~, maxIdx] = max(scores, [], 2);
-
-    % Extract actual ground-truth categorical labels
-    actualLabels = imdsTest.Labels;
-    classes = categories(actualLabels);
-    numClasses = numel(classes);
-
-    % Create predicted categorical labels matching ground-truth categories
-    predCategorical = categorical(classes(maxIdx), classes);
-
-    % 3. Confusion Matrix (rows = true, cols = pred)
-    cm = confusionmat(actualLabels, predCategorical);
-    totalSamples = sum(cm(:));
-
-    % 4. Top-1 Overall Accuracy
-    accuracy = sum(diag(cm)) / totalSamples;
-
-    % 5. Compute Per-Class Precision, Recall (Sensitivity), and F1 Score
-    precision = zeros(1, numClasses);
-    recall    = zeros(1, numClasses);
-    f1Score   = zeros(1, numClasses);
-
-    for i = 1:numClasses
-        tp = cm(i, i);
-        fp = sum(cm(:, i)) - tp;
-        fn = sum(cm(i, :)) - tp;
-
-        if (tp + fp) > 0
-            precision(i) = tp / (tp + fp);
-        end
-        if (tp + fn) > 0
-            recall(i) = tp / (tp + fn);
-        end
-        if (precision(i) + recall(i)) > 0
-            f1Score(i) = 2 * (precision(i) * recall(i)) / (precision(i) + recall(i));
-        end
+% 2. Auto-Detect Test CSV
+candidateTestCSVs = {fullfile(aptosDir, 'test.csv'), fullfile(aptosDir, 'test-1.csv')};
+testCsvPath = '';
+for k = 1:numel(candidateTestCSVs)
+    if isfile(candidateTestCSVs{k})
+        testCsvPath = candidateTestCSVs{k}; break;
     end
-
-    % 6. Compute Quadratic Weighted Kappa (QWK)
-    actualNum = double(actualLabels);
-    predNum   = double(predCategorical);
-
-    % Weight matrix calculation
-    w = zeros(numClasses, numClasses);
-    for i = 1:numClasses
-        for j = 1:numClasses
-            w(i,j) = ((i - j)^2) / ((numClasses - 1)^2);
-        end
-    end
-
-    % Expected matrix calculation
-    histActual  = sum(cm, 2);
-    histPred    = sum(cm, 1);
-    expectedMat = (histActual * histPred) / totalSamples;
-
-    obsErr = sum(sum(w .* cm)) / totalSamples;
-    expErr = sum(sum(w .* expectedMat)) / totalSamples;
-
-    if expErr == 0
-        kappaScore = 1.0;
-    else
-        kappaScore = 1.0 - (obsErr / expErr);
-    end
-
-    % 7. Compute One-vs-Rest ROC AUC per class
-    rocAUC = zeros(1, numClasses);
-    for i = 1:numClasses
-        binaryTrue = (actualNum == i);
-        classScores = scores(:, i);
-
-        try
-            [~, ~, ~, auc] = perfcurve(binaryTrue, classScores, true);
-            rocAUC(i) = auc;
-        catch
-            rocAUC(i) = NaN;
-        end
-    end
-
-    % 8. ICDR Class Names Mapping
-    icdrMap = containers.Map({'0','1','2','3','4'}, ...
-        {'No DR', 'Mild', 'Moderate', 'Severe', 'Proliferative DR'});
-
-    classNames = cell(1, numClasses);
-    for i = 1:numClasses
-        cName = char(classes(i));
-        if isKey(icdrMap, cName)
-            classNames{i} = icdrMap(cName);
-        else
-            classNames{i} = cName;
-        end
-    end
-
-    % 9. Build and Return Output Struct
-    metrics = struct();
-    metrics.accuracy        = accuracy;
-    metrics.confusionMatrix = cm;
-    metrics.classNames      = classNames;
-    metrics.precision       = precision;
-    metrics.recall          = recall;
-    metrics.f1Score        = f1Score;
-    metrics.kappaScore     = kappaScore;
-    metrics.rocAUC         = rocAUC;
-
 end
+
+if isempty(testCsvPath)
+    error('Could not locate test CSV in %s.', aptosDir);
+end
+
+% 3. Map Test Data Safely (Case-Insensitive)
+fprintf('Mapping test image files on disk...\n');
+testTbl = readtable(testCsvPath);
+
+if ismember('diagnosis', testTbl.Properties.VariableNames)
+    labelsRaw = testTbl.diagnosis;
+else
+    labelsRaw = testTbl.dr_level;
+end
+
+dirFiles = dir(testImgDir);
+dirFiles = dirFiles(~[dirFiles.isdir]);
+fileMap = containers.Map('KeyType', 'char', 'ValueType', 'char');
+for k = 1:numel(dirFiles)
+    [~, fnameClean, fext] = fileparts(dirFiles(k).name);
+    fileMap(lower(char(fnameClean))) = fullfile(testImgDir, [fnameClean, fext]);
+end
+
+idCodes = string(testTbl.id_code);
+validPaths = {};
+validLabels = [];
+
+for i = 1:height(testTbl)
+    [~, cleanID, ~] = fileparts(char(idCodes(i)));
+    cleanKey = lower(cleanID);
+    if isKey(fileMap, cleanKey)
+        validPaths{end+1, 1} = fileMap(cleanKey); %#ok<AGROW>
+        validLabels(end+1, 1) = labelsRaw(i); %#ok<AGROW>
+    end
+end
+
+if isempty(validPaths)
+    error('Zero test images matched. Please check your test folder and CSV.');
+end
+
+imdsTest = imageDatastore(validPaths, 'Labels', categorical(validLabels));
+fprintf('Successfully matched %d test images.\n\n', numel(validPaths));
+
+% 4. Load Trained Model
+modelPath = fullfile(projectRoot, 'models', 'classification', 'drClassifier.mat');
+fprintf('Loading trained model from %s...\n', modelPath);
+loaded = load(modelPath, 'net');
+net = loaded.net;
+
+% 5. Run Inference
+fprintf('Running predictions on test set (this may take a minute)...\n');
+imdsTest.ReadSize = 1;
+augimdsTest = augmentedImageDatastore([224 224], imdsTest);
+
+predLabels = classify(net, augimdsTest);
+trueLabels = imdsTest.Labels;
+
+% 6. Calculate Confusion Matrix & Metrics
+confMat = confusionmat(trueLabels, predLabels);
+numClasses = 5;
+totalSamples = sum(confMat, 'all');
+
+fprintf('\n======================================================\n');
+fprintf('                CLINICAL METRICS (TEST SET)             \n');
+fprintf('======================================================\n');
+
+for i = 1:numClasses
+    TP = confMat(i, i);
+    FN = sum(confMat(i, :)) - TP;
+    FP = sum(confMat(:, i)) - TP;
+    TN = totalSamples - (TP + FN + FP);
+    
+    sensitivity = TP / (TP + FN);
+    specificity = TN / (TN + FP);
+    
+    if isnan(sensitivity), sensitivity = 0; end
+    if isnan(specificity), specificity = 0; end
+    
+    fprintf('Class %d (Grade %d): Sensitivity = %5.2f%% | Specificity = %5.2f%%\n', ...
+        i-1, i-1, sensitivity*100, specificity*100);
+end
+
+% 7. Compute Quadratic Weighted Kappa (QWK)
+W = zeros(numClasses, numClasses);
+for i = 1:numClasses
+    for j = 1:numClasses
+        W(i,j) = ((i - j)^2) / ((numClasses - 1)^2);
+    end
+end
+
+rowSums = sum(confMat, 2);
+colSums = sum(confMat, 1);
+E = (rowSums * colSums) / totalSamples;
+
+observedLoss = sum(W .* confMat, 'all');
+expectedLoss = sum(W .* E, 'all');
+qwk = 1 - (observedLoss / expectedLoss);
+
+fprintf('------------------------------------------------------\n');
+fprintf('Quadratic Weighted Kappa (QWK): %.4f\n', qwk);
+fprintf('======================================================\n');
+
+% 8. Plot Confusion Matrix
+figure('Name', 'Confusion Matrix');
+chart = confusionchart(trueLabels, predLabels);
+chart.Title = sprintf('Diabetic Retinopathy Classification (QWK: %.4f)', qwk);
+chart.RowSummary = 'row-normalized';
+chart.ColumnSummary = 'column-normalized';

@@ -1,12 +1,4 @@
 function net = trainClassifier(imdsTrain, imdsValidation)
-% =========================================================================
-% trainClassifier  -  Fine-tune EfficientNet-B0 for DR severity classification
-% =========================================================================
-% Inputs  : imdsTrain      - imageDatastore of training images with Labels
-%           imdsValidation - imageDatastore of validation images with Labels
-% Outputs : net            - Trained network saved to models/classification/drClassifier.mat
-% =========================================================================
-
 % 1. Load pre-trained EfficientNet-b0 base architecture
 baseNet = efficientnetb0;
 lgraph = layerGraph(baseNet);
