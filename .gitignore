@@ -1,4 +1,4 @@
-﻿# =============================================================================
+# =============================================================================
 # .gitignore  -  DR_SIH  |  Explainable AI for Diabetic Retinopathy Screening
 # PS ID 26038
 # =============================================================================
@@ -51,7 +51,17 @@ desktop.ini
 *.swp
 *.swo
 
-# ── Python (if any utility scripts added later) ───────────────────────────
+# ── Python & YOLO Artefacts ────────────────────────────────────────────────
 __pycache__/
 *.pyc
 .env
+runs/
+yolov8s.pt
+dataset_yolo/images/*
+dataset_yolo/labels/*
+!dataset_yolo/images/**/.gitkeep
+!dataset_yolo/labels/**/.gitkeep
+!dataset_yolo/data.yaml
+*.cab
+vc_redist*
+*.bak

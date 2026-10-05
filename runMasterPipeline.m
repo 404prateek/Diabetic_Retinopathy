@@ -57,12 +57,23 @@ probMap   = predict(unetModel, I_unet);                  % returns H x W x numCl
 vesselProb      = probMap(:,:,2,1);                      % channel 2 = vessel probability
 vesselOnlyMask  = vesselProb > 0.5;                      % binary logical mask
 
-% 5. Run EfficientNet Classification via classify()
+% 5. Run YOLOv8 Lesion Detection (Module 2.5 - Center Panel)
+fprintf('Running YOLOv8 Lesion Detection...\n');
+addpath('module2_segmentation');
+yoloOnnxPath = fullfile('models', 'detection', 'best.onnx');
+
+% Optional vessel-subtracted input for lesion localization
+I_vesselFree = imresize(I, [512 512]);
+I_vesselFree(repmat(vesselOnlyMask, [1 1 3])) = 0;
+
+[annotatedLesions, bboxes, bScores, bLabels] = detectLesionsYOLO(I_vesselFree, yoloOnnxPath);
+
+% 6. Run EfficientNet Classification via classify()
 fprintf('Running DR Classification...\n');
 I_class              = im2single(imresize(I, [224 224])); % single [0,1] for EfficientNet
 [predLabel, scores]  = classify(classModel, I_class);
 
-% 6. Map Output to Clinical Labels
+% 7. Map Output to Clinical Labels
 icdrLabels = ["No DR", "Mild", "Moderate", "Severe", "Proliferative DR"];
 gradeNum   = str2double(string(predLabel));
 if isnan(gradeNum) && ismember(string(predLabel), icdrLabels)
@@ -76,21 +87,33 @@ else
 end
 confidence = double(max(scores(:))) * 100;
 
-% 7. Display Final Clinical Dashboard
-figure('Name', 'Automated DR Diagnostic Dashboard', 'Position', [100, 100, 1000, 450]);
+% 8. Display Final Three-Panel Hybrid Clinical Dashboard
+figure('Name', 'Automated DR Diagnostic & Lesion Detection Dashboard', 'Position', [60, 100, 1350, 450]);
 
-subplot(1, 2, 1);
-% Overlay vessel pixels in bright red using labeloverlay
+% Left Panel: U-Net Blood Vessel Mask
+subplot(1, 3, 1);
 B = labeloverlay(imresize(I, [512 512]), vesselOnlyMask, 'Colormap', [1 0 0], 'Transparency', 0.4);
 imshow(B);
-title('Module 2: U-Net Vessel Masking');
+title('Module 2: U-Net Vessel Masking', 'FontWeight', 'bold');
 
-subplot(1, 2, 2);
+% Center Panel: YOLOv8 Lesion Detection Bounding Boxes
+subplot(1, 3, 2);
+imshow(annotatedLesions);
+if isempty(bboxes)
+    title(sprintf('YOLOv8: Lesion Detection\n(MA, HE, EX, SE Bounding Boxes)'), 'FontWeight', 'bold');
+else
+    title(sprintf('YOLOv8: %d Lesions Detected\n(MA: %d, HE: %d, EX: %d, SE: %d)', ...
+        size(bboxes, 1), sum(bLabels=="Microaneurysm"), sum(bLabels=="Hemorrhage"), ...
+        sum(bLabels=="Hard Exudate"), sum(bLabels=="Soft Exudate")), 'FontWeight', 'bold');
+end
+
+% Right Panel: EfficientNet-B0 Classification
+subplot(1, 3, 3);
 imshow(imresize(I, [224 224]));
 if gradeNum >= 0
-    title(sprintf('Module 3: Classification\nDiagnosis: %s (Grade %d)\nConfidence: %.1f%%', ...
-        finalDiagnosis, gradeNum, confidence));
+    title(sprintf('Module 3: DR Classification\nDiagnosis: %s (Grade %d)\nConfidence: %.1f%%', ...
+        finalDiagnosis, gradeNum, confidence), 'FontWeight', 'bold');
 else
-    title(sprintf('Module 3: Classification\nDiagnosis: %s\nConfidence: %.1f%%', ...
-        finalDiagnosis, confidence));
+    title(sprintf('Module 3: DR Classification\nDiagnosis: %s\nConfidence: %.1f%%', ...
+        finalDiagnosis, confidence), 'FontWeight', 'bold');
 end

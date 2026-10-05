@@ -1,0 +1,12 @@
+# YOLOv8 Dataset Configuration for Diabetic Retinopathy Lesions
+path: C:/Users/Admin/.gemini/antigravity-ide/scratch/Diabetic_Retinopathy/dataset_yolo
+train: images/train
+val: images/val
+
+# Class configuration
+nc: 4
+names:
+  0: microaneurysm
+  1: hemorrhage
+  2: hard_exudate
+  3: soft_exudate

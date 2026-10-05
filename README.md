@@ -1,4 +1,4 @@
-﻿<div align="center">
+<div align="center">
 
 # DR-Screen
 ### Explainable AI for Diabetic Retinopathy Screening in Rural India
@@ -156,6 +156,17 @@ This section documents all contributions merged into the main branch.
 | `trainClassifier.m` | Fine-tunes EfficientNet-B0 for 5-class ICDR grading. Fixed layer discovery using `isa()` type-checks (replaces broken `isprop('LearnableParameters')`). Explicit class names on `classificationLayer`. L2 regularisation, piecewise LR schedule, `OutputNetwork='best-validation-loss'`. |
 | `classifyDR.m` | Loads trained network (persistent cache), resizes to 224x224, converts to `single [0,1]` via `im2single()` (critical fix - uint8 gave wrong results), runs `classify()`, maps output to ICDR string. |
 | `evaluateClassifier.m` | Confusion matrix, per-class precision/recall/F1, quadratic weighted kappa (QWK), one-vs-rest ROC AUC. |
+
+### Module 2.5 - Hybrid YOLOv8 Lesion Detection (`scripts/`, `models/detection/`)
+
+**Four-Phase Architecture: MATLAB Preprocessing -> Python YOLOv8 Training -> MATLAB Dashboard**
+
+| Phase | Script / Component | Description |
+|-------|--------------------|-------------|
+| **Phase 1: Dataset Acquisition & Formatting** | [`scripts/download_idrid.py`](file:///scripts/download_idrid.py)<br>[`scripts/convert_idrid_to_yolo.py`](file:///scripts/convert_idrid_to_yolo.py) | Downloads or synthesizes IDRiD lesion masks (MA, HE, EX, SE), extracts connected component bounding boxes, normalizes coordinates to YOLOv8 format (`<class> <xc> <yc> <w> <h>`), splits into `train`/`val`, and generates `dataset_yolo/data.yaml`. |
+| **Phase 2: Vessel Subtraction Preprocessing** | [`scripts/vessel_subtract_batch.m`](file:///scripts/vessel_subtract_batch.m)<br>[`scripts/vessel_subtract_batch.py`](file:///scripts/vessel_subtract_batch.py) | Segments blood vessels via `vessel_unet.mat` (or Frangi filter fallback) and applies inpainting (`regionfill` / Telea) to produce vessel-free retinal images, preventing confusion between dark vessels and microaneurysms/hemorrhages. |
+| **Phase 3: YOLOv8s Training (Python)** | [`scripts/train_yolov8.py`](file:///scripts/train_yolov8.py)<br>`dataset_yolo/data.yaml` | Trains YOLOv8s (Small) configured with `batch=8` and `imgsz=512` to maximize lesion feature extraction while strictly honoring the 4 GB VRAM ceiling of the NVIDIA RTX 3050. |
+| **Phase 4: ONNX Export & Dashboard Integration** | [`scripts/export_onnx.py`](file:///scripts/export_onnx.py)<br>[`module2_segmentation/detectLesionsYOLO.m`](file:///module2_segmentation/detectLesionsYOLO.m)<br>[`runMasterPipeline.m`](file:///runMasterPipeline.m) | Exports trained `.pt` weights to static opset-12 ONNX (`best.onnx`) with single output tensor `[1, 8, 5376]`, synchronizes with `C:/SIH_Work/Diabetic_Retinopathy`, and updates `runMasterPipeline.m` to display a 3-panel clinical dashboard (Left: U-Net vessels, Center: YOLOv8 lesion bounding boxes, Right: EfficientNet classification). |
 
 ### Module 4 - Explainability & Report (`module4_explainability/`)
 
