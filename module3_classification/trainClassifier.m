@@ -1,4 +1,4 @@
-﻿function net = trainClassifier(imdsTrain, imdsValidation)
+function net = trainClassifier(imdsTrain, imdsValidation)
 % =========================================================================
 % trainClassifier  -  Fine-tune EfficientNet-B0 for DR severity classification
 % =========================================================================
