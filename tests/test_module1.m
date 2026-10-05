@@ -1,12 +1,6 @@
-%% test_module1.m  -  Unit tests for Module 1: Quality Assessment
-% =========================================================================
-% Project : Explainable AI for DR Screening (PS ID 26038)
-% Owner   : Member 1  (module1_quality/)
-% Purpose : Minimal smoke-tests for assessQuality() and enhanceFundus().
-%           Run from repo root:  >> run('tests/test_module1.m')
-% =========================================================================
+% Unit tests for Module 1: Quality Assessment
 
-fprintf('=== Module 1 Tests: Quality Assessment ===\n\n');
+fprintf('Running Module 1 Tests: Quality Assessment...\n');
 
 %% Create a dummy 256x256 synthetic fundus image (grey disk on black)
 [xx, yy] = meshgrid(1:256, 1:256);
@@ -16,7 +10,7 @@ dummyImg(:,:,1) = uint8(mask * 80);
 dummyImg(:,:,2) = uint8(mask * 120);   % Green channel brightest (retina-like)
 dummyImg(:,:,3) = uint8(mask * 60);
 
-%% --- Test 1: assessQuality returns required fields -----------------------
+% Test 1: assessQuality returns required fields
 fprintf('Test 1: assessQuality() output struct fields...\n');
 result = assessQuality(dummyImg);
 
@@ -37,7 +31,7 @@ assert(isnumeric(result.brightnessStd)  && isscalar(result.brightnessStd), ...
 
 fprintf('  PASS  (status="%s", sharpness=%.2f)\n\n', result.status, result.sharpness);
 
-%% --- Test 2: enhanceFundus returns same spatial size ---------------------
+% Test 2: enhanceFundus returns same spatial size
 fprintf('Test 2: enhanceFundus() output size...\n');
 enhanced = enhanceFundus(dummyImg);
 
@@ -46,8 +40,8 @@ assert(isequal(size(enhanced), size(dummyImg)), ...
        'FAIL: enhanced size must match input size');
 
 fprintf('  PASS  (size=%dx%dx%d)\n\n', size(enhanced,1), size(enhanced,2), size(enhanced,3));
-%% --- Test 3: Quality gate rejects severe blur ----------------------------
 
+% Test 3: Quality gate rejects severe blur
 severelyBlurred = imgaussfilt(dummyImg, 15);
 blurResult = assessQuality(severelyBlurred);
 
@@ -59,9 +53,7 @@ assert(blurResult.status == "REJECT", ...
 
 fprintf('Test 3: Severe blur correctly rejected... PASS\n\n');
 
-
-%% --- Test 4: Enhancement function produces valid output -----------------
-
+% Test 4: Enhancement function produces valid output
 enhancedTest = enhanceFundus(dummyImg);
 
 assert(isa(enhancedTest, 'uint8'), ...
@@ -71,4 +63,4 @@ assert(isequal(size(enhancedTest), size(dummyImg)), ...
     'FAIL: enhanced image size must match input');
 
 fprintf('Test 4: Enhancement output validation... PASS\n\n');
-fprintf('=== Module 1: ALL TESTS PASSED ===\n');
+fprintf('Module 1: All tests passed.\n');

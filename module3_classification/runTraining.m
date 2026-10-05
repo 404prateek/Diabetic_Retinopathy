@@ -1,6 +1,4 @@
-% =========================================================================
-% runTraining.m - Master Script with Robust Case & String Mappings
-% =========================================================================
+% Master script to map APTOS dataset and fine-tune EfficientNet-B0
 clear; clc;
 % 1. Define paths
 projectRoot = pwd;
@@ -71,9 +69,7 @@ net = trainClassifier(imdsTrain, imdsValidation);
 fprintf('Training complete and model successfully saved!\n');
 
 
-% =========================================================================
-% Helper Function: Dynamic File & Label Resolver (Robust Case & Type Fix)
-% =========================================================================
+% File and label datastore resolver
 function [imds, matchedCount] = buildDatastoreFromTable(imgFolder, tbl)
     % 1. Extract diagnosis or dr_level column
     if ismember('diagnosis', tbl.Properties.VariableNames)

@@ -1,27 +1,6 @@
-﻿function [classification, confidence] = classifyDR(I)
-% =========================================================================
-% classifyDR  -  Classify diabetic retinopathy grade in a fundus image
-% =========================================================================
-% Purpose : Load the trained EfficientNet-B0 classifier and run inference
-%           on a single fundus image, returning an ICDR grade string and
-%           softmax confidence.
-%
-% Owner   : Member 3  (module3_classification/)
-%
-% Inputs  :
-%   I              - (H x W x 3 uint8)  Enhanced RGB fundus image
-%
-% Outputs :
-%   classification - (string)  One of "No DR" | "Mild" | "Moderate" |
-%                              "Severe" | "Proliferative DR"
-%   confidence     - (double)  Softmax probability of predicted class [0,1]
-%
-% BugFix (2024-10): Added im2single() preprocessing so the network receives
-%   single-precision [0,1] input instead of raw uint8. Fixed column-vector
-%   scores handling. Added guard for missing model file.
-%
-% Dependencies : MATLAB Deep Learning Toolbox
-% =========================================================================
+function [classification, confidence] = classifyDR(I)
+% Classify diabetic retinopathy grade in a fundus image using EfficientNet-B0.
+% Returns ICDR grade string and softmax confidence.
 
 % 1. Load the trained network (cached across calls via persistent)
 persistent net;

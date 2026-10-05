@@ -1,43 +1,15 @@
 function segmentation = runSegmentation(I)
-% =========================================================================
-% runSegmentation  -  Segment retinal vessels and DR lesions in a fundus image
-% =========================================================================
-% Purpose : Apply a trained deep segmentation model (U-Net) to detect
-%           retinal blood vessels. Falls back to classical Frangi
-%           vesselness if no trained model is available.
-%
-% Owner   : Member 2  (module2_segmentation/)
-%
-% Inputs  :
-%   I             - (H x W x 3 uint8)  Enhanced RGB fundus image.
-%
-% Outputs :
-%   segmentation  - struct with fields:
-%     .vesselMask   (H x W logical)  Binary mask of detected blood vessels
-%     .lesionMask   (H x W logical)  Binary mask of all detected lesions
-%     .lesionCount  (int)            Total number of distinct lesion regions
-%     .dice         (double)         Dice vs ground-truth (NaN if unavailable)
-%     .iou          (double)         IoU vs ground-truth  (NaN if unavailable)
-%
-% BugFix (2024-10):
-%   - Fixed divide-by-zero in Frangi when c=0 (all-black image)
-%   - Fixed graythresh on all-zero top-hat/bottom-hat -> all pixels passing
-%   - Updated U-Net path to use dlnetwork/predict (trainnet-compatible)
-%
-% Dependencies : MATLAB Image Processing Toolbox
-%               (MATLAB Deep Learning Toolbox optional - for U-Net inference)
-% =========================================================================
+% Segment retinal blood vessels and lesions.
+% Uses trained U-Net if available in models/segmentation/vessel_unet.mat,
+% with a classical Frangi filter fallback.
 
-% Input guard
 if ~isa(I, 'uint8')
     I = im2uint8(I);
 end
 
 [H, W, ~] = size(I);
 
-% ------------------------------------------------------------------
-% Attempt 1: Load pre-trained U-Net vessel model (trainnet-trained dlnetwork)
-% ------------------------------------------------------------------
+% Check for trained U-Net model
 vesselModelPath = fullfile('models', 'segmentation', 'vessel_unet.mat');
 useDeepModel    = exist(vesselModelPath, 'file');
 
@@ -68,14 +40,14 @@ if useDeepModel
     lesionMask = false(H, W);
 
 else
-    % --- Classical morphological fallback --------------------------------
+    % Classical morphological fallback
     green      = im2double(I(:,:,2));
     greenClahe = adapthisteq(green, 'ClipLimit', 0.01, 'NumTiles', [8 8]);
 
-    % Vessel segmentation via Frangi vesselness (Hessian ridge detector)
+    % Vessel segmentation via Frangi vesselness
     vesselMask = frangiVesselness(greenClahe);
 
-    % ---- Lesion segmentation ----
+    % Lesion segmentation
     se_large = strel('disk', 10);
 
     % Hard exudates: bright structures (top-hat)
@@ -110,11 +82,8 @@ segmentation.iou         = NaN;
 end % runSegmentation
 
 
-% =========================================================================
-% Helper: safe binary thresholding that handles all-zero maps
-% =========================================================================
 function mask = safeBinaryThreshold(img, factor)
-% Returns false(size) if image has no signal, otherwise Otsu threshold * factor.
+% Safe binary thresholding handling zero signal
 if max(img(:)) < eps
     mask = false(size(img));
     return;
@@ -124,17 +93,14 @@ mask   = img > thresh;
 end
 
 
-% =========================================================================
-% Helper: Frangi 2-D vesselness filter (Hessian-based ridge detector)
-% =========================================================================
 function vesselMask = frangiVesselness(img)
-% Multi-scale Frangi vesselness - handles all-black images safely.
+% Multi-scale Frangi vesselness filter
 
-scales = [1, 2, 3];   % Gaussian sigma values
-beta   = 0.5;          % blob-shape sensitivity
+scales = [1, 2, 3];
+beta   = 0.5;
 imgMax = max(img(:));
 
-% Guard c against zero-image (prevents div-by-zero in exp term)
+% Guard against zero-image
 c = max(0.5 * imgMax, 1e-6);
 
 [H, W]     = size(img);
@@ -143,7 +109,6 @@ vesselness = zeros(H, W);
 for sigma = scales
     [Hxx, Hxy, Hyy] = hessian2D(img, sigma);
 
-    % Eigenvalues of the 2x2 Hessian at every pixel
     tmp     = sqrt(max((Hxx - Hyy).^2 + 4 * Hxy.^2, 0));
     lambda1 = 0.5 * ((Hxx + Hyy) - tmp);
     lambda2 = 0.5 * ((Hxx + Hyy) + tmp);
@@ -157,7 +122,6 @@ for sigma = scales
     vesselness = max(vesselness, v);
 end
 
-% Handle all-zero vesselness (blank image)
 if max(vesselness(:)) < eps
     vesselMask = false(H, W);
     return;
@@ -166,17 +130,14 @@ end
 thresh     = graythresh(vesselness) * 0.5;
 vesselMask = logical(vesselness > thresh);
 
-% Morphological clean-up
 vesselMask = bwareaopen(vesselMask, 20);
 vesselMask = imfill(vesselMask, 'holes');
 
 end
 
 
-% =========================================================================
-% Helper: 2-D scale-normalised Hessian via Gaussian derivative filters
-% =========================================================================
 function [Dxx, Dxy, Dyy] = hessian2D(img, sigma)
+% 2-D scale-normalised Hessian via Gaussian derivative filters
 sz  = ceil(3 * sigma) * 2 + 1;
 [x, y] = meshgrid(-(sz-1)/2 : (sz-1)/2, -(sz-1)/2 : (sz-1)/2);
 

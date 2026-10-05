@@ -1,29 +1,6 @@
-﻿function heatmap = explainPrediction(I, classification)
-% =========================================================================
-% explainPrediction  -  Generate a Grad-CAM saliency heatmap
-% =========================================================================
-% Purpose : Produce a Gradient-weighted Class Activation Map (Grad-CAM)
-%           overlay that highlights the retinal regions most responsible
-%           for the classifier's decision.
-%
-% Owner   : Member 4  (module4_explainability/)
-%
-% Inputs  :
-%   I              - (H x W x 3 uint8)  The same image passed to classifyDR()
-%   classification - (string)  Grade string returned by classifyDR()
-%
-% Outputs :
-%   heatmap        - (H x W x 3 uint8)  Jet-colourmap Grad-CAM overlay
-%                    blended with the original image at alpha = 0.5
-%
-% BugFix (2024-10):
-%   - Fixed layerNames extraction: {gcNet.Layers.Name} fails for DAGNetwork;
-%     replaced with arrayfun to extract Name from each Layer object.
-%   - Added guard for classIdx out-of-bounds when model class count != 5.
-%   - Added im2single() preprocessing to match what classify() expects.
-%
-% Dependencies : MATLAB Deep Learning Toolbox (gradCAM), Image Processing Toolbox
-% =========================================================================
+function heatmap = explainPrediction(I, classification)
+% Generate a Grad-CAM saliency heatmap highlighting regions driving the DR prediction.
+% Blends jet colormap over the input image.
 
 % Input guards
 if ~isa(I, 'uint8')
@@ -40,9 +17,7 @@ if isempty(classIdx)
     classIdx = 1;
 end
 
-% ------------------------------------------------------------------
-% Attempt 1: Proper Grad-CAM using trained network
-% ------------------------------------------------------------------
+% Try Grad-CAM with trained model
 modelPath  = fullfile('models', 'classification', 'drClassifier.mat');
 useGradCAM = exist(modelPath, 'file') && ~isempty(which('gradCAM'));
 
@@ -56,40 +31,32 @@ if useGradCAM
     % Preprocess to match training input format
     Iresized = im2single(imresize(I, [224, 224]));
 
-    % ---- BUG FIX: robust layer name extraction for DAGNetwork ----------
-    % {gcNet.Layers.Name} fails when Layers is a Layer object array, not a
-    % struct array. Use arrayfun to safely extract Name from each element.
     allLayers  = gcNet.Layers;
     layerNames = arrayfun(@(l) l.Name, allLayers, 'UniformOutput', false);
 
-    % Find the last convolutional layer (best for Grad-CAM visualisation)
+    % Find last conv or batchnorm layer
     isConv     = arrayfun(@(l) isa(l, 'nnet.cnn.layer.Convolution2DLayer'), allLayers);
     convIdx    = find(isConv);
 
     if isempty(convIdx)
-        % Fallback: last batch normalisation layer (common in EfficientNet)
         isBN    = arrayfun(@(l) isa(l, 'nnet.cnn.layer.BatchNormalizationLayer'), allLayers);
         convIdx = find(isBN);
     end
 
     if isempty(convIdx)
-        % Nothing suitable found - fall through to synthetic saliency
         warning('explainPrediction:noConvLayer', ...
                 'No convolutional layer found; using synthetic saliency fallback.');
         useGradCAM = false;
     else
         targetLayer = layerNames{convIdx(end)};
 
-        % Map classIdx to the categorical class label used during training
         outLayer    = allLayers(end);
-        netClasses  = outLayer.Classes;        % categorical array of trained classes
+        netClasses  = outLayer.Classes;
         numNetCls   = numel(netClasses);
 
-        % Clamp index so it never exceeds what the network knows about
-        safeIdx    = min(classIdx, numNetCls);
+        safeIdx     = min(classIdx, numNetCls);
         targetClass = netClasses(safeIdx);
 
-        % Compute Grad-CAM and resize to original image dimensions
         scoreMap = gradCAM(gcNet, Iresized, targetClass, ...
                            'ReductionLayer', targetLayer);
         scoreMap = imresize(double(scoreMap), [H, W]);
@@ -97,9 +64,7 @@ if useGradCAM
 end
 
 if ~useGradCAM
-    % ------------------------------------------------------------------
-    % Fallback: synthetic saliency from Laplacian of green channel
-    % ------------------------------------------------------------------
+    % Saliency fallback using green channel Laplacian
     green    = im2double(I(:,:,2));
     lap      = imfilter(green, fspecial('laplacian', 0.2), 'replicate');
     scoreMap = abs(lap);
@@ -120,9 +85,7 @@ if ~useGradCAM
     scoreMap = scoreMap + 0.4 * mat2gray(emphasis);
 end
 
-% ------------------------------------------------------------------
-% Normalise -> jet colourmap -> alpha-blend with original
-% ------------------------------------------------------------------
+% Normalize and blend with jet colormap
 scoreNorm = mat2gray(double(scoreMap));
 scoreNorm = imgaussfilt(scoreNorm, 1.5);   % slight smoothing
 

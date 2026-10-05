@@ -1,19 +1,8 @@
-% =========================================================================
-% evaluateSegmentation.m - Robust Vessel Segmentation Evaluation
-% =========================================================================
-% Purpose : Evaluate vessel segmentation quality against DRIVE ground-truth
-%           masks using Dice and IoU metrics. Works with the new dlnetwork
-%           U-Net trained via trainVessels_Corrected.m.
-%
-% Owner   : Member 2  (module2_segmentation/)
-%
-% Usage   : Run from repo root >> evaluateSegmentation
-%
-% Dependencies : MATLAB Image Processing Toolbox, Deep Learning Toolbox
-% =========================================================================
+% Evaluate vessel segmentation quality against ground-truth masks using Dice and IoU.
+
 clear; clc;
 
-% 1. Dynamically locate project paths
+% Locate project paths
 scriptFolder = fileparts(mfilename('fullpath'));
 projectRoot  = fileparts(scriptFolder);
 

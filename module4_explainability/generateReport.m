@@ -1,41 +1,16 @@
-﻿function generateReport(I, quality, segmentation, classification, confidence, heatmap)
-% =========================================================================
-% generateReport  -  Export a structured PDF screening report
-% =========================================================================
-% Purpose : Compile all pipeline outputs into a single PDF report.
-%
-% Owner   : Member 4  (module4_explainability/)
-%
-% Inputs  :
-%   I              - (H x W x 3 uint8)   Original fundus image
-%   quality        - struct              Output of assessQuality()
-%   segmentation   - struct              Output of runSegmentation()
-%   classification - (string)            DR grade from classifyDR()
-%   confidence     - (double)            Softmax confidence from classifyDR()
-%   heatmap        - (H x W x 3 uint8)  Grad-CAM overlay from explainPrediction()
-%
-% BugFix (2024-10):
-%   - Replaced deprecated datestr(now,...) with datetime API (R2023b+)
-%   - Added 'PaperOrientation','portrait' so -fillpage works on all platforms
-%   - Added graceful handling of NaN confidence (REJECT pipeline path)
-%
-% Dependencies : MATLAB Image Processing Toolbox
-% =========================================================================
+function generateReport(I, quality, segmentation, classification, confidence, heatmap)
+% Export a structured PDF screening report compiling pipeline outputs.
 
-% ------------------------------------------------------------------
-% 0. Ensure results/ directory exists
-% ------------------------------------------------------------------
+% Ensure results directory exists
 if ~exist('results', 'dir')
     mkdir('results');
 end
 
-% Timestamp - use datetime API (datestr is deprecated in R2023b)
+% Timestamp
 ts       = char(datetime('now', 'Format', 'yyyyMMdd_HHmmss'));
 baseName = fullfile('results', [ts '_DRReport']);
 
-% ------------------------------------------------------------------
-% 1. Build report figure
-% ------------------------------------------------------------------
+% Build report figure
 fig = figure('Name',            'DR Screening Report', ...
              'NumberTitle',     'off', ...
              'Visible',         'off', ...
@@ -153,9 +128,7 @@ text(ax, 0.02, 0.98, reportText, ...
 sgtitle('DR-Screen  |  Explainable AI Screening Report  |  PS ID 26038', ...
         'FontWeight', 'bold', 'FontSize', 11);
 
-% ------------------------------------------------------------------
-% 2. Export to PDF (PNG fallback on systems without PDF printer)
-% ------------------------------------------------------------------
+% Export to PDF (PNG fallback)
 pdfFile = [baseName '.pdf'];
 pngFile = [baseName '.png'];
 

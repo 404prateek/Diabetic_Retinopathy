@@ -1,6 +1,4 @@
-% =========================================================================
-% trainVessels_Corrected.m - Modern U-Net with Custom Dice Loss
-% =========================================================================
+% Train U-Net on DRIVE dataset with Dice loss
 clear; clc;
 
 % 1. Lock in the EXACT paths verified by your evaluation script
@@ -47,9 +45,7 @@ net = trainedNet;
 save(savePath, "net");
 fprintf('Training complete! Model successfully saved to %s\n', savePath);
 
-% =========================================================================
-% Helper Function 1: Resizing and Data Augmentation
-% =========================================================================
+% Resizing and data augmentation
 function data = resizeAndAugmentData(data)
 img = imresize(data{1}, [512 512]);
 mask = imresize(data{2}, [512 512], 'nearest');
@@ -62,9 +58,7 @@ data{1} = img;
 data{2} = mask;
 end
 
-% =========================================================================
-% Helper Function 2: Custom Dice Loss Math for trainnet
-% =========================================================================
+% Custom Dice loss for trainnet
 function loss = diceLossFunction(Y, T)
 % Y: Network Predictions, T: Ground Truth Targets
 % Calculate intersection and union over spatial and batch dimensions (1, 2, 4)

@@ -1,20 +1,10 @@
-﻿%% main.m  -  DR Screening Pipeline Driver Script
-% =========================================================================
-% Project : Explainable AI for Diabetic Retinopathy Screening (PS ID 26038)
-% Purpose : Top-level script to load a dataset, pick one test image,
-%           run the full pipeline via mainPipeline(), and display results.
-% Owner   : Member 4 (integration) / any team member for smoke-testing
-% =========================================================================
-% Usage   : Run this script from the repo root in MATLAB:
-%               >> main
-% =========================================================================
+% DR Screening Pipeline Driver Script
 
 clc; clear; close all;
 
-%% --- Configuration -------------------------------------------------------
-DATA_PATH = 'data/APTOS';   % Change to 'data/IDRiD', 'data/DRIVE', etc.
+DATA_PATH = 'data/APTOS';
 
-%% --- Step 1: Load dataset ------------------------------------------------
+% Load dataset
 fprintf('[1/3] Loading dataset from: %s\n', DATA_PATH);
 imds = loadDataset(DATA_PATH);
 
@@ -22,17 +12,16 @@ if isempty(imds.Files)
     error('No images found in "%s". Add dataset files first (see README).', DATA_PATH);
 end
 
-%% --- Step 2: Pick a test image -------------------------------------------
-% For a quick smoke-test use the first image in the datastore.
+% Pick test image
 testImagePath = imds.Files{1};
 fprintf('[2/3] Test image: %s\n', testImagePath);
 I = imread(testImagePath);
 
-%% --- Step 3: Run the full pipeline ---------------------------------------
+% Run pipeline
 fprintf('[3/3] Running mainPipeline...\n');
 result = mainPipeline(I);
 
-%% --- Step 4: Display results ---------------------------------------------
+% Display results
 fprintf('\n--- Pipeline Result ---\n');
 fprintf('Status         : %s\n', result.status);
 fprintf('Quality Status : %s\n', result.quality.status);

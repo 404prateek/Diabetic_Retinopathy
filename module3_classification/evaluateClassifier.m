@@ -1,6 +1,4 @@
-% =========================================================================
-% evaluateClassifier.m - Calculate Sensitivity, Specificity, and QWK
-% =========================================================================
+% Calculate Sensitivity, Specificity, and Quadratic Weighted Kappa (QWK) on test set
 clear; clc;
 
 % 1. Define Paths

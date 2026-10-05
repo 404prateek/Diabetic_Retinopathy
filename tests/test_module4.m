@@ -1,12 +1,6 @@
-﻿%% test_module4.m  -  Unit tests for Module 4: Explainability
-% =========================================================================
-% Project : Explainable AI for DR Screening (PS ID 26038)
-% Owner   : Member 4  (module4_explainability/)
-% Purpose : Minimal smoke-tests for explainPrediction() and generateReport().
-%           Run from repo root:  >> run('tests/test_module4.m')
-% =========================================================================
+% Unit tests for Module 4: Explainability
 
-fprintf('=== Module 4 Tests: Explainability ===\n\n');
+fprintf('Running Module 4 Tests: Explainability...\n');
 
 %% Create a dummy 256x256 synthetic fundus image and fake pipeline outputs
 [xx, yy] = meshgrid(1:256, 1:256);
@@ -29,7 +23,7 @@ dummySeg.iou         = NaN;
 dummyClass = "Moderate";
 dummyConf  = 0.82;
 
-%% --- Test 1: explainPrediction returns uint8 RGB of correct size --------
+% Test 1: explainPrediction returns uint8 RGB of correct size
 fprintf('Test 1: explainPrediction() output...\n');
 heatmap = explainPrediction(dummyImg, dummyClass);
 
@@ -41,7 +35,7 @@ assert(isequal(size(heatmap,1), size(dummyImg,1)) && ...
 
 fprintf('  PASS  (size=%dx%dx%d)\n\n', size(heatmap,1), size(heatmap,2), size(heatmap,3));
 
-%% --- Test 2: generateReport runs without error (smoke test) -------------
+% Test 2: generateReport runs without error (smoke test)
 fprintf('Test 2: generateReport() smoke test...\n');
 try
     generateReport(dummyImg, dummyQuality, dummySeg, dummyClass, dummyConf, heatmap);
@@ -51,4 +45,4 @@ catch ME
     rethrow(ME);
 end
 
-fprintf('=== Module 4: ALL TESTS PASSED ===\n');
+fprintf('Module 4: All tests passed.\n');

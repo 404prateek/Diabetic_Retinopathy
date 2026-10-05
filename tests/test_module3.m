@@ -1,15 +1,6 @@
-﻿%% test_module3.m  -  Unit tests for Module 3: Classification
-% =========================================================================
-% Project : Explainable AI for DR Screening (PS ID 26038)
-% Owner   : Member 3  (module3_classification/)
-% Purpose : Minimal smoke-tests for classifyDR() and evaluateClassifier().
-%           Run from repo root:  >> run('tests/test_module3.m')
-%
-% BugFix (2024-10): classifyDR() throws if drClassifier.mat is absent.
-%   Wrapped in try/catch so the test SKIPS gracefully instead of crashing.
-% =========================================================================
+% Unit tests for Module 3: Classification
 
-fprintf('=== Module 3 Tests: Classification ===\n\n');
+fprintf('Running Module 3 Tests: Classification...\n');
 
 %% Create a dummy 256x256 synthetic fundus image
 [xx, yy] = meshgrid(1:256, 1:256);
@@ -17,7 +8,7 @@ mask      = sqrt((xx-128).^2 + (yy-128).^2) < 100;
 dummyImg  = uint8(zeros(256,256,3));
 dummyImg(:,:,2) = uint8(mask * 120);
 
-%% --- Test 1: classifyDR output types and valid grade string --------------
+% Test 1: classifyDR output types and valid grade string
 fprintf('Test 1: classifyDR() outputs...\n');
 
 modelPath = fullfile('models', 'classification', 'drClassifier.mat');
@@ -46,15 +37,14 @@ else
     end
 end
 
-%% --- Test 2: evaluateClassifier returns required struct fields -----------
+% Test 2: evaluateClassifier returns required struct fields
 fprintf('Test 2: evaluateClassifier() struct fields (structural check)...\n');
 fprintf('  [SKIP] Requires a trained network and test imageDatastore.\n');
 fprintf('         Run manually after trainClassifier() completes.\n\n');
 
-%% --- Test 3: classifyDR persistent net clear safety ---------------------
+% Test 3: classifyDR persistent net cache check
 fprintf('Test 3: classifyDR persistent cache safety...\n');
 if exist(modelPath, 'file')
-    % Calling twice must not error (persistent cache should reuse)
     try
         [c1, ~] = classifyDR(dummyImg);
         [c2, ~] = classifyDR(dummyImg);
@@ -68,4 +58,4 @@ else
     fprintf('  [SKIP] No model file present.\n\n');
 end
 
-fprintf('=== Module 3: ALL APPLICABLE TESTS PASSED ===\n');
+fprintf('Module 3: All applicable tests passed.\n');
