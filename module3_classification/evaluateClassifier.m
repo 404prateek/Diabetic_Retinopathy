@@ -68,7 +68,7 @@ net = loaded.net;
 % 5. Run Inference
 fprintf('Running predictions on test set (this may take a minute)...\n');
 imdsTest.ReadSize = 1;
-augimdsTest = augmentedImageDatastore([224 224], imdsTest);
+augimdsTest = augmentedImageDatastore([224 224 3], imdsTest);
 
 predLabels = classify(net, augimdsTest);
 trueLabels = imdsTest.Labels;

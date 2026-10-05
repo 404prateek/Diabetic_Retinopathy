@@ -8,7 +8,8 @@ function net = trainClassifier(imdsTrain, imdsValidation)
 %
 % BugFix (2024-10): Fixed layer discovery from broken isprop('LearnableParameters')
 %   to isa() type-checks.  Added explicit class names to classificationLayer.
-%   Switched from deprecated trainNetwork to trainnet (MATLAB R2023b+).
+%   Note: trainNetwork is the correct API for lgraph/DAGNetwork (R2023b).
+%         Use trainnet() only when migrating to dlnetwork.
 % =========================================================================
 
 % 1. Load pre-trained EfficientNet-B0 base architecture
